@@ -88,7 +88,7 @@ const ManageBooks = () => {
         <h1 className="text-2xl font-bold text-gray-800">Manage Books</h1>
         <Link
           to={`/admin/books/add`}
-          className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+          className="flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
         >
           <FiPlus className="mr-2" /> Add New Book
         </Link>

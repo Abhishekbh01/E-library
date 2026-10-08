@@ -1,31 +1,62 @@
 import React, { useState, useEffect } from 'react';
-import { FiEdit2, FiTrash2, FiUserPlus, FiSearch } from 'react-icons/fi';
+import { FiTrash2, FiSearch } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import api from '../../utils/api';
+import { USER_API_END_POINT } from '../../utils/constant';
 
 const ManageUsers = () => {
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const itemsPerPage = 10;
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchUsers();
-  }, [currentPage, searchTerm]);
+  }, []);
 
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
-      const response = await api.get(
-        `/admin/users?page=${currentPage}&limit=${itemsPerPage}&search=${searchTerm}`
-      );
-      setUsers(response.data.users);
-      setTotalPages(Math.ceil(response.data.total / itemsPerPage));
+      setError(null);
+      const response = await api.get(`${USER_API_END_POINT}/getAll`);
+      
+      if (response.data.success) {
+        setUsers(response.data.users || []);
+      } else {
+        setError(response.data.message || 'Failed to load users');
+        toast.error(response.data.message || 'Failed to load users');
+      }
     } catch (error) {
       console.error('Error fetching users:', error);
-      toast.error('Failed to load users');
+      setError(error.response?.data?.message || 'Failed to load users');
+      toast.error(error.response?.data?.message || 'Failed to load users');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!searchTerm.trim()) {
+      fetchUsers();
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await api.get(`${USER_API_END_POINT}/search?query=${encodeURIComponent(searchTerm)}`);
+      
+      if (response.data.success) {
+        setUsers(response.data.users || []);
+      } else {
+        setError(response.data.message || 'Search failed');
+        toast.error(response.data.message || 'Search failed');
+      }
+    } catch (error) {
+      console.error('Error searching users:', error);
+      setError(error.response?.data?.message || 'Search failed');
+      toast.error(error.response?.data?.message || 'Search failed');
     } finally {
       setIsLoading(false);
     }
@@ -34,34 +65,52 @@ const ManageUsers = () => {
   const handleDelete = async (userId) => {
     if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       try {
-        await api.delete(`/admin/users/${userId}`);
-        toast.success('User deleted successfully');
-        fetchUsers();
+        const response = await api.delete(`${USER_API_END_POINT}/${userId}`);
+        
+        if (response.data.success) {
+          toast.success('User deleted successfully');
+          // Remove user from local state
+          setUsers(users.filter(user => user._id !== userId));
+        } else {
+          toast.error(response.data.message || 'Failed to delete user');
+        }
       } catch (error) {
         console.error('Error deleting user:', error);
-        toast.error('Failed to delete user');
+        toast.error(error.response?.data?.message || 'Failed to delete user');
       }
     }
   };
 
-  const toggleUserStatus = async (userId, currentStatus) => {
-    try {
-      await api.put(`/admin/users/${userId}/status`, { isActive: !currentStatus });
-      toast.success(`User ${currentStatus ? 'deactivated' : 'activated'} successfully`);
-      fetchUsers();
-    } catch (error) {
-      console.error('Error updating user status:', error);
-      toast.error('Failed to update user status');
+  const handleChangeRole = async (userId, currentRole) => {
+    const newRole = currentRole === 'admin' ? 'member' : 'admin';
+    
+    if (window.confirm(`Are you sure you want to change this user's role to ${newRole}?`)) {
+      try {
+        const response = await api.put(`${USER_API_END_POINT}/${userId}/role`, { role: newRole });
+        
+        if (response.data.success) {
+          toast.success(`User role changed to ${newRole}`);
+          // Update user in local state
+          setUsers(users.map(user => 
+            user._id === userId ? { ...user, role: newRole } : user
+          ));
+        } else {
+          toast.error(response.data.message || 'Failed to change role');
+        }
+      } catch (error) {
+        console.error('Error changing user role:', error);
+        toast.error(error.response?.data?.message || 'Failed to change role');
+      }
     }
   };
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setCurrentPage(1);
+  const handleClearSearch = () => {
+    setSearchTerm('');
     fetchUsers();
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     const options = { year: 'numeric', month: 'short', day: 'numeric' };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
@@ -93,6 +142,15 @@ const ManageUsers = () => {
           >
             Search
           </button>
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={handleClearSearch}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              Clear
+            </button>
+          )}
         </form>
       </div>
 
@@ -102,8 +160,20 @@ const ManageUsers = () => {
           <div className="flex justify-center items-center p-8">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
           </div>
+        ) : error ? (
+          <div className="text-center py-8 text-red-500">
+            <p className="font-medium">{error}</p>
+            <button
+              onClick={fetchUsers}
+              className="mt-4 text-indigo-600 hover:text-indigo-800 underline"
+            >
+              Try Again
+            </button>
+          </div>
         ) : users.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">No users found</div>
+          <div className="text-center py-8 text-gray-500">
+            {searchTerm ? 'No users found matching your search' : 'No users found'}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -117,9 +187,6 @@ const ManageUsers = () => {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Role
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Joined
@@ -136,17 +203,17 @@ const ManageUsers = () => {
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10">
                           <img
-                            className="h-10 w-10 rounded-full"
-                            src={user.avatar || '/user-avatar.png'}
-                            alt={user.name}
+                            className="h-10 w-10 rounded-full object-cover"
+                            src={user.profile?.profilePhoto || 'https://via.placeholder.com/40'}
+                            alt={user.fullname}
                             onError={(e) => {
                               e.target.onerror = null;
-                              e.target.src = '/user-avatar.png';
+                              e.target.src = 'https://via.placeholder.com/40';
                             }}
                           />
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                          <div className="text-sm font-medium text-gray-900">{user.fullname}</div>
                           <div className="text-sm text-gray-500">ID: {user._id.substring(0, 8)}...</div>
                         </div>
                       </div>
@@ -155,17 +222,10 @@ const ManageUsers = () => {
                       <div className="text-sm text-gray-900">{user.email}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                      }`}>
                         {user.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {user.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -173,139 +233,24 @@ const ManageUsers = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
-                        onClick={() => toggleUserStatus(user._id, user.isActive)}
-                        className={`mr-3 ${
-                          user.isActive ? 'text-yellow-600 hover:text-yellow-900' : 'text-green-600 hover:text-green-900'
-                        }`}
+                        onClick={() => handleChangeRole(user._id, user.role)}
+                        className="mr-3 text-indigo-600 hover:text-indigo-900"
+                        title={`Change to ${user.role === 'admin' ? 'member' : 'admin'}`}
                       >
-                        {user.isActive ? 'Deactivate' : 'Activate'}
+                        {user.role === 'admin' ? 'Make Member' : 'Make Admin'}
                       </button>
                       <button
                         onClick={() => handleDelete(user._id)}
                         className="text-red-600 hover:text-red-900"
+                        title="Delete user"
                       >
-                        Delete
+                        <FiTrash2 className="inline" />
                       </button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-            <div className="flex-1 flex justify-between sm:hidden">
-              <button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
-                  currentPage === 1
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
-                  currentPage === totalPages
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                Next
-              </button>
-            </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
-                  <span className="font-medium">
-                    {Math.min(currentPage * itemsPerPage, users.length + (currentPage - 1) * itemsPerPage)}
-                  </span>{' '}
-                  of <span className="font-medium">{users.length + (currentPage - 1) * itemsPerPage}</span> results
-                </p>
-              </div>
-              <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                  <button
-                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
-                      currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="sr-only">Previous</span>
-                    <svg
-                      className="h-5 w-5"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </button>
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                          currentPage === pageNum
-                            ? 'bg-indigo-50 border-indigo-500 text-indigo-600 z-10'
-                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                  <button
-                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
-                      currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="sr-only">Next</span>
-                    <svg
-                      className="h-5 w-5"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </button>
-                </nav>
-              </div>
-            </div>
           </div>
         )}
       </div>
