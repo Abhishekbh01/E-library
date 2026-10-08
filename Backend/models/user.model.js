@@ -20,7 +20,7 @@ const userSchema = new mongoose.Schema({
     role:{
         type: String,
         enum: ["admin", "member"],
-        default: "user"
+        default: "member"
     },
     borrowedBooks: [{
         type: mongoose.Schema.Types.ObjectId,

@@ -391,3 +391,272 @@ export const getWishlist = async (req, res) => {
         });
     }
 };
+
+// ==========================================
+// ADMIN USER MANAGEMENT CONTROLLERS
+// ==========================================
+
+export const getAllUsers = async (req, res) => {
+    try {
+        const requestingUser = await User.findById(req.id);
+        
+        if (!requestingUser) {
+            return res.status(404).json({
+                message: "User not found",
+                success: false
+            });
+        }
+
+        if (requestingUser.role !== 'admin') {
+            return res.status(403).json({
+                message: "Admin access required",
+                success: false
+            });
+        }
+
+        const users = await User.find({}).select('-password');
+        
+        if (!users || users.length === 0) {
+            return res.status(200).json({
+                message: "No users found",
+                success: true,
+                users: []
+            });
+        }
+
+        return res.status(200).json({
+            message: "Users fetched successfully",
+            success: true,
+            users
+        });
+
+    } catch (error) {
+        console.error("Error fetching all users:", error);
+        return res.status(500).json({
+            message: "Failed to fetch users",
+            success: false
+        });
+    }
+};
+
+export const searchUsers = async (req, res) => {
+    try {
+        const requestingUser = await User.findById(req.id);
+        
+        if (!requestingUser) {
+            return res.status(404).json({
+                message: "User not found",
+                success: false
+            });
+        }
+
+        if (requestingUser.role !== 'admin') {
+            return res.status(403).json({
+                message: "Admin access required",
+                success: false
+            });
+        }
+
+        const { query } = req.query;
+
+        if (!query) {
+            return res.status(400).json({
+                message: "Search query is required",
+                success: false
+            });
+        }
+
+        const users = await User.find({
+            $or: [
+                { fullname: { $regex: query, $options: "i" } },
+                { email: { $regex: query, $options: "i" } }
+            ]
+        }).select('-password');
+
+        if (!users || users.length === 0) {
+            return res.status(200).json({
+                message: "No users found",
+                success: true,
+                users: []
+            });
+        }
+
+        return res.status(200).json({
+            message: "Search results",
+            success: true,
+            users
+        });
+
+    } catch (error) {
+        console.error("Error searching users:", error);
+        return res.status(500).json({
+            message: "Failed to search users",
+            success: false
+        });
+    }
+};
+
+export const getUserById = async (req, res) => {
+    try {
+        const requestingUser = await User.findById(req.id);
+        
+        if (!requestingUser) {
+            return res.status(404).json({
+                message: "User not found",
+                success: false
+            });
+        }
+
+        if (requestingUser.role !== 'admin') {
+            return res.status(403).json({
+                message: "Admin access required",
+                success: false
+            });
+        }
+
+        const { userId } = req.params;
+
+        const user = await User.findById(userId).select('-password');
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+                success: false
+            });
+        }
+
+        return res.status(200).json({
+            message: "User retrieved successfully",
+            success: true,
+            user
+        });
+
+    } catch (error) {
+        console.error("Error fetching user by ID:", error);
+        return res.status(500).json({
+            message: "Failed to fetch user",
+            success: false
+        });
+    }
+};
+
+export const deleteUser = async (req, res) => {
+    try {
+        const requestingUser = await User.findById(req.id);
+        
+        if (!requestingUser) {
+            return res.status(404).json({
+                message: "User not found",
+                success: false
+            });
+        }
+
+        if (requestingUser.role !== 'admin') {
+            return res.status(403).json({
+                message: "Admin access required",
+                success: false
+            });
+        }
+
+        const { userId } = req.params;
+
+        // Prevent admin from deleting themselves
+        if (userId === req.id) {
+            return res.status(400).json({
+                message: "You cannot delete your own account",
+                success: false
+            });
+        }
+
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+                success: false
+            });
+        }
+
+        await User.findByIdAndDelete(userId);
+
+        return res.status(200).json({
+            message: "User deleted successfully",
+            success: true
+        });
+
+    } catch (error) {
+        console.error("Error deleting user:", error);
+        return res.status(500).json({
+            message: "Failed to delete user",
+            success: false
+        });
+    }
+};
+
+export const updateUserRole = async (req, res) => {
+    try {
+        const requestingUser = await User.findById(req.id);
+        
+        if (!requestingUser) {
+            return res.status(404).json({
+                message: "User not found",
+                success: false
+            });
+        }
+
+        if (requestingUser.role !== 'admin') {
+            return res.status(403).json({
+                message: "Admin access required",
+                success: false
+            });
+        }
+
+        const { userId } = req.params;
+        const { role } = req.body;
+
+        if (!role || (role !== 'admin' && role !== 'member')) {
+            return res.status(400).json({
+                message: "Invalid role. Must be 'admin' or 'member'",
+                success: false
+            });
+        }
+
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+                success: false
+            });
+        }
+
+        // Prevent admin from changing their own role
+        if (userId === req.id) {
+            return res.status(400).json({
+                message: "You cannot change your own role",
+                success: false
+            });
+        }
+
+        user.role = role;
+        await user.save();
+
+        return res.status(200).json({
+            message: "User role updated successfully",
+            success: true,
+            user: {
+                _id: user._id,
+                fullname: user.fullname,
+                email: user.email,
+                role: user.role
+            }
+        });
+
+    } catch (error) {
+        console.error("Error updating user role:", error);
+        return res.status(500).json({
+            message: "Failed to update user role",
+            success: false
+        });
+    }
+};

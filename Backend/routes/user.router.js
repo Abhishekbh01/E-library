@@ -1,5 +1,5 @@
 import express from 'express';
-import { login, logout, numberOfBorrowedBooks, register, updateProfile, addBorrowedBook, addToWishlist, removeFromWishlist, getWishlist } from '../controllers/user.controller.js';
+import { login, logout, numberOfBorrowedBooks, register, updateProfile, addBorrowedBook, addToWishlist, removeFromWishlist, getWishlist, getAllUsers, searchUsers, getUserById, deleteUser, updateUserRole } from '../controllers/user.controller.js';
 import isAuthenticated from '../middleware/isAuthenticated.js';
 import { multipleUpload } from '../middleware/multer.js';
 
@@ -20,6 +20,13 @@ router.route('/wishlist')
 router.route('/wishlist/:bookId')
     .delete(isAuthenticated, removeFromWishlist);
 
+// Admin user management routes (must be before /:userId)
+router.route('/getAll').get(isAuthenticated, getAllUsers);
+router.route('/search').get(isAuthenticated, searchUsers);
+router.route('/:userId/role').put(isAuthenticated, updateUserRole);
+router.route('/:userId')
+    .get(isAuthenticated, getUserById)
+    .delete(isAuthenticated, deleteUser);
 
 export default router;
 
