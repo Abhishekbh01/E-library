@@ -14,7 +14,6 @@ const BrowseSection = () => {
     const { user } = useSelector(store => store.auth);
     const dispatch = useDispatch();
     const location = useLocation();
-    const userBorrowedBooks = user?.borrowedBooks || [];
     const navigate = useNavigate();
     
     const params = new URLSearchParams(location.search);
@@ -39,13 +38,18 @@ const BrowseSection = () => {
 
     // Filter books based on query & category
     const filteredBooks = Array.isArray(allBooks) ? allBooks.filter(book => {
-        // Convert both IDs to strings for comparison to handle different ID formats
-        const bookId = book._id ? book._id.toString() : '';
-        const isPurchased = userBorrowedBooks.some(borrowedId => 
-            borrowedId && borrowedId.toString() === bookId
-        );
-        return book.title?.toLowerCase().includes(searchQuery.toLowerCase()) &&
-            (category === "all" || (book.category && book.category.toLowerCase() === category.toLowerCase()));
+        // Search by title, author, or category
+        const searchLower = searchQuery.toLowerCase();
+        const matchesSearch = !searchQuery ||
+            book.title?.toLowerCase().includes(searchLower) ||
+            book.author?.toLowerCase().includes(searchLower) ||
+            book.category?.toLowerCase().includes(searchLower);
+
+        // Filter by category dropdown
+        const matchesCategory = category === "all" ||
+            (book.category && book.category.toLowerCase() === category.toLowerCase());
+
+        return matchesSearch && matchesCategory;
     }) : [];
     
     return (
@@ -55,7 +59,7 @@ const BrowseSection = () => {
                 <div className="flex gap-4 mb-6">
                     <Input
                         type="text"
-                        placeholder="Search books..."
+                        placeholder="Search by title, author, or category..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={handleKeyDown}
@@ -72,6 +76,8 @@ const BrowseSection = () => {
                             <SelectItem value="fiction">Fiction</SelectItem>
                             <SelectItem value="non-fiction">Non-Fiction</SelectItem>
                             <SelectItem value="science">Science & Tech</SelectItem>
+                            <SelectItem value="history">History</SelectItem>
+                            <SelectItem value="technology">Technology</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -79,10 +85,9 @@ const BrowseSection = () => {
                 <div className="grid grid-cols-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                     {filteredBooks.length > 0 ? (
                         filteredBooks.map((book) => (
-                            <BookCard 
-                                key={book._id} 
-                                book={book} 
-                                isPurchased={userBorrowedBooks.includes(book._id)}
+                            <BookCard
+                                key={book._id}
+                                book={book}
                             />
                         ))
                     ) : (

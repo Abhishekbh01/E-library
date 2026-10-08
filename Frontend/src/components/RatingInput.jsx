@@ -5,6 +5,15 @@ import PropTypes from "prop-types";
 function RatingInput({ rating, setRating, interactive = true, size = 24 }) {
   const stars = [1, 2, 3, 4, 5];
 
+  const handleStarClick = (starValue) => {
+    console.log("Star clicked:", starValue);
+    console.log("Current rating:", rating);
+    console.log("setRating function:", typeof setRating);
+    if (interactive && setRating) {
+      setRating(starValue);
+    }
+  };
+
   return (
     <div className="flex items-center gap-1">
       {stars.map((star) => (
@@ -12,11 +21,12 @@ function RatingInput({ rating, setRating, interactive = true, size = 24 }) {
           key={star}
           type="button"
           disabled={!interactive}
-          onClick={() => interactive && setRating(star)}
+          onClick={() => handleStarClick(star)}
           className={`transition-colors ${
-            interactive ? "cursor-pointer hover:scale-110" : "cursor-default"
+            interactive ? "cursor-pointer hover:scale-110 active:scale-95" : "cursor-default"
           }`}
           aria-label={`Rate ${star} stars`}
+          style={{ pointerEvents: interactive ? 'auto' : 'none' }}
         >
           <Star
             size={size}

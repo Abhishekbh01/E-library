@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
@@ -14,7 +14,7 @@ import { addToWishlist } from "../redux/wishlistSlice";
 import RatingInput from "../components/RatingInput";
 import ReviewItem from "../components/ReviewItem";
 import RatingSummary from "../components/RatingSummary";
-import { REVIEWS_API_END_POINT } from "../utils/constant";
+import { REVIEWS_API_END_POINT, BOOK_API_END_POINT } from "../utils/constant";
 import axios from "axios";
 
 function BookDetails() {
@@ -33,14 +33,55 @@ function BookDetails() {
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [isEditingReview, setIsEditingReview] = useState(false);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [book, setBook] = useState(null);
+  const [bookLoading, setBookLoading] = useState(true);
 
-  // Get book data from BookCard
-  const book = location.state?.book;
+  // Get book data from location state or fetch from backend
+  const initialBook = location.state?.book;
+  const bookIdFromURL = new URLSearchParams(location.search).get("bookId");
+
+  // Fetch complete book data from backend
+  useEffect(() => {
+    const fetchBook = async () => {
+      try {
+        setBookLoading(true);
+        const bookId = initialBook?._id || bookIdFromURL;
+
+        console.log("Fetching book with ID:", bookId);
+        console.log("Initial book from state:", initialBook);
+
+        if (!bookId) {
+          console.error("No book ID found");
+          toast.error("Book ID is missing");
+          setBookLoading(false);
+          return;
+        }
+
+        const res = await axios.get(
+          `${BOOK_API_END_POINT}/get/${bookId}`,
+          { withCredentials: true }
+        );
+
+        console.log("Book fetched successfully:", res.data.book);
+
+        if (res.data.success) {
+          setBook(res.data.book);
+        }
+      } catch (error) {
+        console.error("Error fetching book:", error);
+        toast.error("Failed to load book details");
+      } finally {
+        setBookLoading(false);
+      }
+    };
+
+    fetchBook();
+  }, [initialBook?._id, bookIdFromURL]);
 
   useEffect(() => {
     const isWishlist = () => {
       return wishlist?.some(
-        (item) => item._id === book._id
+        (item) => item._id === book?._id
       );
     };
 
@@ -103,6 +144,15 @@ function BookDetails() {
       return;
     }
 
+    if (!book?._id) {
+      toast.error("Book information is incomplete");
+      return;
+    }
+
+    console.log("Submitting review for book:", book._id);
+    console.log("Rating:", userRating);
+    console.log("Review:", userReview);
+
     setIsSubmittingReview(true);
     try {
       const res = await axios.post(
@@ -110,6 +160,8 @@ function BookDetails() {
         { rating: userRating, comment: userReview },
         { withCredentials: true }
       );
+
+      console.log("Review response:", res.data);
 
       if (res.data.success) {
         toast.success(
@@ -124,8 +176,50 @@ function BookDetails() {
       }
     } catch (error) {
       console.error("Error submitting review:", error);
+      console.error("Error response:", error.response?.data);
       toast.error(
         error.response?.data?.message || "Failed to submit review"
+      );
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+  // Quick rating submission (rating only, no review)
+  const handleQuickRating = async () => {
+    if (!user) {
+      toast.error("Please login to rate this book");
+      return;
+    }
+
+    if (!userRating || userRating < 1 || userRating > 5) {
+      toast.error("Please select a rating between 1 and 5");
+      return;
+    }
+
+    if (!book?._id) {
+      toast.error("Book information is incomplete");
+      return;
+    }
+
+    setIsSubmittingReview(true);
+    try {
+      const res = await axios.post(
+        `${REVIEWS_API_END_POINT}/add/${book._id}`,
+        { rating: userRating, comment: "" },
+        { withCredentials: true }
+      );
+
+      if (res.data.success) {
+        toast.success("Rating saved successfully");
+        setUserRating(res.data.review.rating);
+        setIsEditingReview(true);
+        await fetchReviews();
+      }
+    } catch (error) {
+      console.error("Error submitting rating:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to save rating"
       );
     } finally {
       setIsSubmittingReview(false);
@@ -165,8 +259,17 @@ function BookDetails() {
   };
   
   // ==========================================
-  // BOOK NOT FOUND
+  // BOOK NOT FOUND / LOADING
   // ==========================================
+
+  if (bookLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+        <p className="mt-4 text-gray-600">Loading book details...</p>
+      </div>
+    );
+  }
 
   if (!book) {
     return (
@@ -395,26 +498,52 @@ function BookDetails() {
               <div className="flex items-center gap-2 mb-6">
 
                 <div className="flex items-center">
-
-                  {[1, 2, 3, 4, 5].map(
-                    (star) => (
-                      <Star
-                        key={star}
-                        size={18}
-                        className={
-                          star <= rating
-                            ? "fill-yellow-400 text-yellow-400"
-                            : "text-gray-300"
-                        }
-                      />
-                    )
+                  {user ? (
+                    // Interactive stars for logged-in users
+                    <RatingInput
+                      rating={userRating || 0}
+                      setRating={setUserRating}
+                      size={18}
+                    />
+                  ) : (
+                    // Static stars for non-logged-in users
+                    <div className="flex items-center">
+                      {[1, 2, 3, 4, 5].map(
+                        (star) => (
+                          <Star
+                            key={star}
+                            size={18}
+                            className={
+                              star <= rating
+                                ? "fill-yellow-400 text-yellow-400"
+                                : "text-gray-300"
+                            }
+                          />
+                        )
+                      )}
+                    </div>
                   )}
-
                 </div>
 
                 <span className="text-gray-600 text-sm">
                   {rating.toFixed(1)} / 5
+                  {userRating && (
+                    <span className="ml-2 text-green-600">
+                      (Your rating: {userRating}/5)
+                    </span>
+                  )}
                 </span>
+
+                {user && (
+                  <Button
+                    size="sm"
+                    onClick={handleQuickRating}
+                    disabled={isSubmittingReview || !userRating}
+                    className="ml-4"
+                  >
+                    {isSubmittingReview ? "Saving..." : "Save"}
+                  </Button>
+                )}
 
               </div>
 
@@ -523,7 +652,7 @@ function BookDetails() {
             reviews={allReviews}
           />
 
-          {/* User's Rating Section */}
+          {/* User's Rating & Review Section */}
           {user ? (
             <div className="bg-white border rounded-lg p-6">
               <h3 className="text-lg font-semibold mb-4">
