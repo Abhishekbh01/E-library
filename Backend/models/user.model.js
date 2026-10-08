@@ -22,9 +22,14 @@ const userSchema = new mongoose.Schema({
         enum: ["admin", "member"],
         default: "user"
     },
-    borrowedBooks: [{ 
-        type: mongoose.Schema.Types.ObjectId, 
+    borrowedBooks: [{
+        type: mongoose.Schema.Types.ObjectId,
         ref: 'Book' ,
+        default: []
+    }],
+    wishlist: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Book',
         default: []
     }],
     profile: {

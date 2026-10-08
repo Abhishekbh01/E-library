@@ -1,4 +1,5 @@
 import { User } from "../models/user.model.js";
+import { Book } from "../models/book.model.js";
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import cloudinary from "../utils/cloudinary.js";
@@ -269,3 +270,124 @@ export const addBorrowedBook = async (req, res) => {
         });
     }
 }
+
+// ==========================================
+// WISHLIST CONTROLLERS
+// ==========================================
+
+export const addToWishlist = async (req, res) => {
+    try {
+        const userId = req.id;
+        const { bookId } = req.body;
+
+        if (!bookId) {
+            return res.status(400).json({
+                message: "Book ID is required",
+                success: false
+            });
+        }
+
+        // Check if book exists
+        const book = await Book.findById(bookId);
+        if (!book) {
+            return res.status(404).json({
+                message: "Book not found",
+                success: false
+            });
+        }
+
+        // Check if book is already in wishlist
+        const user = await User.findById(userId);
+        if (user.wishlist.includes(bookId)) {
+            return res.status(400).json({
+                message: "Book is already in your wishlist",
+                success: false
+            });
+        }
+
+        // Add book to wishlist
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { $push: { wishlist: bookId } },
+            { new: true }
+        ).populate('wishlist');
+
+        return res.status(200).json({
+            message: "Book added to wishlist",
+            user: updatedUser,
+            success: true
+        });
+
+    } catch (error) {
+        console.error("Error adding to wishlist:", error);
+        return res.status(500).json({
+            message: "Failed to add book to wishlist",
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+export const removeFromWishlist = async (req, res) => {
+    try {
+        const userId = req.id;
+        const { bookId } = req.params;
+
+        if (!bookId) {
+            return res.status(400).json({
+                message: "Book ID is required",
+                success: false
+            });
+        }
+
+        // Remove book from wishlist
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { $pull: { wishlist: bookId } },
+            { new: true }
+        ).populate('wishlist');
+
+        return res.status(200).json({
+            message: "Book removed from wishlist",
+            user: updatedUser,
+            success: true
+        });
+
+    } catch (error) {
+        console.error("Error removing from wishlist:", error);
+        return res.status(500).json({
+            message: "Failed to remove book from wishlist",
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+export const getWishlist = async (req, res) => {
+    try {
+        const userId = req.id;
+
+        const user = await User.findById(userId).populate('wishlist');
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+                success: false
+            });
+        }
+
+        return res.status(200).json({
+            message: "Wishlist retrieved successfully",
+            wishlist: user.wishlist,
+            success: true
+        });
+
+    } catch (error) {
+        console.error("Error fetching wishlist:", error);
+        return res.status(500).json({
+            message: "Failed to fetch wishlist",
+            success: false,
+            error: error.message
+        });
+    }
+};

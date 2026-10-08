@@ -155,7 +155,7 @@ const Signup = () => {
                           <Input
                             id="fullname"
                             name="fullname"
-                            placeholder="Abhi Basotra"
+                            placeholder="username"
                             className="pl-10 border-green-200 focus:border-green-500 focus:ring-green-500"
                             value={input.fullname}
                             onChange={handleChange}

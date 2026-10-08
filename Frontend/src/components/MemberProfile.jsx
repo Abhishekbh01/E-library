@@ -375,10 +375,10 @@ const MemberProfile = () => {
                   <User className="h-4 w-4" />
                   Update Profile
                 </Link>
-                <Link to="/settings" className="flex items-center gap-2 text-sm py-1 hover:bg-gray-50 px-2 rounded">
+                {/* <Link to="/settings" className="flex items-center gap-2 text-sm py-1 hover:bg-gray-50 px-2 rounded">
                   <Settings className="h-4 w-4" />
                   Account Settings
-                </Link>
+                </Link> */}
                 <Button
                   variant="destructive"
                   size="sm"

@@ -14,7 +14,7 @@ import technologyBook from '../../assets/knowledge.png'
 import seeAll from '../../assets/list.png'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { LogOut, Search, User2, LayoutDashboard, BookOpen, Users, ShoppingBag, Home } from 'lucide-react'
+import { LogOut, Search, User2, LayoutDashboard, BookOpen, Users, ShoppingBag, Home, Heart } from 'lucide-react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import store from '../../redux/store'
@@ -29,9 +29,12 @@ import {
     AvatarImage
 } from '@/components/ui/avatar'
 import MemberProfile from '../MemberProfile'
+import { Badge } from "@/components/ui/badge"
 
 function Navbar() {
     const { user } = useSelector(store => store.auth);
+    const { wishlist } = useSelector(store => store.wishlist);
+
     return (
         <div className='bg-black overflow-hidden m-0 p-0 box-border'>
             <div className='flex items-center justify-between mx-auto max-w-7xl h-16 overflow-hidden m-0 p-0 box-border'>
@@ -112,8 +115,19 @@ function Navbar() {
                                     </DropdownMenu>
                                 </li>
                                 <li><Link to="/myLibrary" className='text-white hover:text-gray-300'>My Library</Link></li>
+                                <li className="relative">
+                                    <Link to="/wishlist" className='flex items-center text-white hover:text-gray-300'>
+                                        <Heart className='mr-1 h-4 w-4' />
+                                        <span>Wishlist</span>
+                                        {wishlist && wishlist.length > 0 && (
+                                            <Badge className="absolute -top-2 -right-2 bg-red-500 text-white text-xs h-5 w-5 flex items-center justify-center rounded-full p-0">
+                                                {wishlist.length}
+                                            </Badge>
+                                        )}
+                                    </Link>
+                                </li>
                                 <li className="flex items-center">
-                                    <div className="flex w-full max-w-md border rounded-full overflow-hidden bg-white">
+                                    {/* <div className="flex w-full max-w-md border rounded-full overflow-hidden bg-white">
                                         <Input
                                             className="flex-1 text-black bg-transparent h-9 px-4 border-none focus:outline-none"
                                             placeholder="Search books"
@@ -121,7 +135,7 @@ function Navbar() {
                                         <Button className="bg-[#38c29b] hover:bg-[#447c60] px-4 rounded-r-full flex items-center justify-center">
                                             <Search className="h-5 w-5 text-white" />
                                         </Button>
-                                    </div>
+                                    </div> */}
                                 </li>
                             </>
                         )}

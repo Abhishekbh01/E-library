@@ -34,11 +34,31 @@ const bookSchema = new mongoose.Schema({
     coverUrl:{
         type: String,
     },
+    coverImage:{
+        type: String,
+    },
     description: {
         type: String
     },
     bookUrl: {
         type: String
+    },
+    rating: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 5
+    },
+    totalRatings: {
+        type: Number,
+        default: 0
+    },
+    stock: {
+        type: Number,
+        default: 0
+    },
+    publishedYear: {
+        type: Number
     }
 },{timestamps: true})
 

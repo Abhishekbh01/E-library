@@ -124,10 +124,17 @@ export const getAllBooks = async (req, res) => {
             });
         }
 
+        // Ensure all books have rating field (for backward compatibility)
+        const booksWithRating = books.map(book => ({
+            ...book.toObject(),
+            rating: book.rating || 0,
+            totalRatings: book.totalRatings || 0
+        }));
+
         return res.status(200).json({
             message: "List of all books",
             success: true,
-            books
+            books: booksWithRating
         });
     } catch (error) {
         console.log(error);
@@ -164,7 +171,7 @@ export const getBookById = async (req, res) => {
 
 export const updateBook = async (req, res) => {
     try {
-        const { title, author, category, isbn, description } = req.body;
+        const { title, author, category, isbn, description, bookPrice, stock, publishedYear } = req.body;
         const userId = req.id;
         const { bookId } = req.params;
 
@@ -194,6 +201,7 @@ export const updateBook = async (req, res) => {
         let bookUrl = book.bookUrl;
         let coverImage = book.coverImage;
 
+        console.log("Files received:", req.files);
         if (req.files) {
             if (req.files['cover']) {
                 try {
@@ -213,9 +221,14 @@ export const updateBook = async (req, res) => {
                 try {
                     const bookUri = getDataUri(req.files['book'][0]);
                     const cloudResponse = await cloudinary.uploader.upload(bookUri.content, {
-                        resource_type: "raw"
+                        resource_type: "raw",
+                        folder: "books",
+                        type: "upload",
+                        overwrite: true
                     });
-                    bookUrl = cloudResponse.secure_url;
+                    const publicId = cloudResponse.public_id;
+                    const version = cloudResponse.version;
+                    bookUrl = `https://res.cloudinary.com/${process.env.CLOUD_NAME}/raw/upload/v${version}/${publicId}.pdf`;
                 } catch (error) {
                     console.error("Cloudinary PDF Upload Error:", error);
                     return res.status(500).json({
@@ -226,6 +239,7 @@ export const updateBook = async (req, res) => {
             }
         }
 
+        // Update book fields
         book.title = title || book.title;
         book.author = author || book.author;
         book.category = category || book.category;
@@ -233,6 +247,17 @@ export const updateBook = async (req, res) => {
         book.description = description || book.description;
         book.coverImage = coverImage;
         book.bookUrl = bookUrl;
+
+        // Update optional fields if provided
+        if (bookPrice !== undefined && bookPrice !== null && bookPrice !== "") {
+            book.bookPrice = Number(bookPrice);
+        }
+        if (stock !== undefined && stock !== null && stock !== "") {
+            book.stock = Number(stock);
+        }
+        if (publishedYear !== undefined && publishedYear !== null && publishedYear !== "") {
+            book.publishedYear = Number(publishedYear);
+        }
 
         await book.save();
 
@@ -356,6 +381,41 @@ export const searchBook = async (req, res) => {
         console.error(error);
         return res.status(500).json({
             message: "Error in searchBook Controller",
+            success: false
+        });
+    }
+};
+
+// Initialize ratings for existing books (run once)
+export const initializeBookRatings = async (req, res) => {
+    try {
+        const { Review } = await import('../models/review.model.js');
+
+        const books = await Book.find({ rating: { $exists: false } });
+
+        for (const book of books) {
+            const reviews = await Review.find({ bookId: book._id });
+            const totalRatings = reviews.length;
+
+            if (totalRatings === 0) {
+                book.rating = 0;
+                book.totalRatings = 0;
+            } else {
+                const sum = reviews.reduce((acc, review) => acc + review.rating, 0);
+                book.rating = Math.round((sum / totalRatings) * 10) / 10;
+                book.totalRatings = totalRatings;
+            }
+            await book.save();
+        }
+
+        return res.status(200).json({
+            message: `Initialized ratings for ${books.length} books`,
+            success: true
+        });
+    } catch (error) {
+        console.error("Error initializing book ratings:", error);
+        return res.status(500).json({
+            message: "Failed to initialize ratings",
             success: false
         });
     }
